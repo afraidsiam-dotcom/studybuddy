@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="bn"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>StudyBuddy BD – অ্যাডমিন প্যানেল</title>
+<style>
+:root{--bg:#071725;--p:#102638;--s:#24475d;--t:#f3efff;--m:#9bb5c5;--a:#574dee;--g:#2ecc8f;--r:#ff5d6c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font-family:system-ui,'Hind Siliguri',sans-serif}
+.w{max-width:760px;margin:auto;padding:14px 14px 60px}h1{font-size:20px;margin:6px 0 14px}h2{font-size:15px;margin:0 0 10px}
+.c{background:var(--p);border:1px solid var(--s);border-radius:16px;padding:14px;margin-bottom:12px}
+input,textarea,select{width:100%;padding:11px;border-radius:11px;border:1px solid var(--s);background:#0b1e2e;color:var(--t);font:inherit;margin:4px 0 10px}
+label{font-size:12px;color:var(--m)}button{border:0;border-radius:11px;padding:10px 14px;background:var(--a);color:#fff;font:inherit;font-weight:600}
+button.g{background:#1b3a50}button.r{background:var(--r)}button.s{padding:6px 10px;font-size:12px}
+.tabs{display:flex;gap:8px;margin-bottom:12px}.tabs button{flex:1;background:#1b3a50}.tabs button.on{background:var(--a)}
+.st{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.st div{background:var(--p);border:1px solid var(--s);border-radius:14px;padding:10px;text-align:center}
+.st b{font-size:22px;display:block}.st span{font-size:11px;color:var(--m)}
+.u{display:flex;justify-content:space-between;gap:8px;align-items:center}.u small{color:var(--m);display:block;font-size:11px;word-break:break-all}
+.bl{color:var(--r);font-size:11px;font-weight:700}.row{display:flex;gap:8px;align-items:center}.row input[type=checkbox]{width:auto;margin:0}
+#msg{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#000c;padding:9px 16px;border-radius:20px;font-size:13px;display:none}
+.hide{display:none}
+</style></head><body><div class="w">
+<h1>🎛️ StudyBuddy BD – অ্যাডমিন প্যানেল</h1>
+
+<div id="login" class="c">
+  <h2>লগইন</h2>
+  <label>Firebase apiKey</label><input id="fk" placeholder="AIza...">
+  <label>Firebase projectId</label><input id="fp" placeholder="studybuddy-bd">
+  <label>অ্যাডমিন ইমেইল</label><input id="em" type="email">
+  <label>পাসওয়ার্ড</label><input id="pw" type="password">
+  <button id="go">লগইন করো</button>
+</div>
+
+<div id="main" class="hide">
+  <div class="tabs"><button id="t1" class="on">👥 ইউজার</button><button id="t2">⚙️ কন্ট্রোল</button><button id="out" class="g" style="flex:0 0 auto">বের হও</button></div>
+
+  <div id="pg1">
+    <div class="st"><div><b id="n1">0</b><span>মোট ইউজার</span></div><div><b id="n2">0</b><span>আজ সক্রিয়</span></div><div><b id="n3">0</b><span>৭ দিনে সক্রিয়</span></div></div>
+    <input id="q" placeholder="নাম বা আইডি দিয়ে খুঁজুন...">
+    <div id="list"></div>
+  </div>
+
+  <div id="pg2" class="hide">
+    <div class="c"><h2>📢 ঘোষণা</h2>
+      <div class="row"><input type="checkbox" id="aOn"><label for="aOn">ঘোষণা চালু</label></div>
+      <textarea id="aTx" rows="3" placeholder="সবাইকে যা দেখাতে চান"></textarea></div>
+    <div class="c"><h2>🛠️ মেইনটেন্যান্স মোড</h2>
+      <div class="row"><input type="checkbox" id="mOn"><label for="mOn">চালু (অ্যাপ বন্ধ থাকবে)</label></div>
+      <textarea id="mTx" rows="2" placeholder="যেমন: কিছুক্ষণের মধ্যে ফিরছি"></textarea></div>
+    <div class="c"><h2>⬆️ আপডেট</h2>
+      <label>সর্বশেষ ভার্সন</label><input id="vL" placeholder="1.0.1">
+      <label>ন্যূনতম ভার্সন (এর নিচে হলে জোর করে আপডেট)</label><input id="vM" placeholder="1.0.0">
+      <label>আপডেট লিংক (APK/ওয়েবসাইট)</label><input id="vU" placeholder="https://...">
+    </div>
+    <button id="sv" style="width:100%">✅ সেভ করো</button>
+  </div>
+</div>
+<div id="msg"></div></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toast=t=>{const m=$('msg');m.textContent=t;m.style.display='block';setTimeout(()=>m.style.display='none',2500)};
+let db,users=[];
+try{const c=JSON.parse(localStorage.getItem('sbAdminCfg')||'{}');$('fk').value=c.k||'';$('fp').value=c.p||'';$('em').value=c.e||''}catch(e){}
+
+$('go').onclick=async()=>{
+  const k=$('fk').value.trim(),p=$('fp').value.trim(),e=$('em').value.trim(),w=$('pw').value;
+  if(!k||!p||!e||!w)return toast('সব ঘর পূরণ করো');
+  try{
+    if(!firebase.apps.length)firebase.initializeApp({apiKey:k,projectId:p,authDomain:p+'.firebaseapp.com'});
+    await firebase.auth().signInWithEmailAndPassword(e,w);
+    localStorage.setItem('sbAdminCfg',JSON.stringify({k,p,e}));
+    db=firebase.firestore();$('login').classList.add('hide');$('main').classList.remove('hide');
+    loadConfig();loadUsers();
+  }catch(x){toast('লগইন ব্যর্থ: ভুল তথ্য বা সেটআপ')}
+};
+$('out').onclick=()=>{firebase.auth().signOut();location.reload()};
+$('t1').onclick=()=>tab(1);$('t2').onclick=()=>tab(2);
+function tab(n){$('pg1').classList.toggle('hide',n!==1);$('pg2').classList.toggle('hide',n!==2);$('t1').classList.toggle('on',n===1);$('t2').classList.toggle('on',n===2)}
+
+async function loadConfig(){
+  const d=await db.doc('config/app').get();const c=d.exists?d.data():{};
+  $('aOn').checked=!!c.announceOn;$('aTx').value=c.announcement||'';
+  $('mOn').checked=!!c.maintenance;$('mTx').value=c.maintenanceMsg||'';
+  $('vL').value=c.latestVersion||'';$('vM').value=c.minVersion||'';$('vU').value=c.updateUrl||'';
+}
+$('sv').onclick=async()=>{
+  try{await db.doc('config/app').set({
+    announceOn:$('aOn').checked,announcement:$('aTx').value.trim(),
+    maintenance:$('mOn').checked,maintenanceMsg:$('mTx').value.trim(),
+    latestVersion:$('vL').value.trim(),minVersion:$('vM').value.trim(),updateUrl:$('vU').value.trim(),
+    updatedAt:new Date().toISOString()},{merge:true});toast('সেভ হয়েছে ✅')}
+  catch(e){toast('সেভ হয়নি: Rules পরীক্ষা করো')}
+};
+
+async function loadUsers(){
+  try{const s=await db.collection('users').orderBy('last','desc').limit(500).get();
+    users=s.docs.map(d=>({id:d.id,...d.data()}));render()}
+  catch(e){$('list').innerHTML='<div class="c">ইউজার লোড হয়নি। Firestore Rules দেখো।</div>'}
+}
+function ago(iso){if(!iso)return '—';const m=(Date.now()-new Date(iso))/6e4;
+  if(m<2)return 'এইমাত্র';if(m<60)return Math.floor(m)+' মিনিট আগে';if(m<1440)return Math.floor(m/60)+' ঘণ্টা আগে';return Math.floor(m/1440)+' দিন আগে'}
+function render(){
+  const now=Date.now();
+  $('n1').textContent=users.length;
+  $('n2').textContent=users.filter(u=>now-new Date(u.last)<864e5).length;
+  $('n3').textContent=users.filter(u=>now-new Date(u.last)<6048e5).length;
+  const q=$('q').value.trim().toLowerCase();
+  const l=users.filter(u=>!q||(u.name||'').toLowerCase().includes(q)||u.id.toLowerCase().includes(q));
+  $('list').innerHTML=l.map(u=>`<div class="c u"><div><b>${esc(u.name||'নামহীন')}</b> ${u.blocked?'<span class="bl">ব্লকড</span>':''}
+    <small>${esc(u.id.slice(0,13))} • v${esc(u.ver||'?')} • ${esc(u.device||'')}</small>
+    <small>শেষ দেখা: ${ago(u.last)} • যোগ: ${ago(u.first)}</small></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><button class="s ${u.blocked?'g':'r'}" data-b="${esc(u.id)}">${u.blocked?'আনব্লক':'ব্লক'}</button>
+    <button class="s g" data-d="${esc(u.id)}">মুছো</button></div></div>`).join('')||'<div class="c">কোনো ইউজার নেই</div>';
+}
+$('q').oninput=render;
+$('list').onclick=async e=>{
+  const b=e.target.dataset.b,d=e.target.dataset.d;
+  try{
+    if(b){const u=users.find(x=>x.id===b);await db.doc('users/'+b).set({blocked:!u.blocked},{merge:true});u.blocked=!u.blocked;render()}
+    if(d&&confirm('এই ইউজার মুছে ফেলবে?')){await db.doc('users/'+d).delete();users=users.filter(x=>x.id!==d);render()}
+  }catch(x){toast('ব্যর্থ হয়েছে')}
+};
+</script></body></html>
